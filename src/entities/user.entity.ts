@@ -20,11 +20,11 @@ export class UserEntity extends BaseEntity {
   @Column({ nullable: true })
   image: string;
 
-  @Column({ 
+  @Column({
     type: "enum",
     array: true,
     enum: UserRoleEnum,
-    default: [UserRoleEnum.USER], 
+    default: [UserRoleEnum.USER],
   })
   roles: UserRoleEnum[];
 }

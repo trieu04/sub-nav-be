@@ -14,7 +14,7 @@ export class AdminGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const { jwtPayload } = request;
 
-    if(jwtPayload instanceof JwtPayloadAuthDto) {
+    if (jwtPayload instanceof JwtPayloadAuthDto) {
       return jwtPayload.roles.includes(UserRoleEnum.ADMIN);
     }
 

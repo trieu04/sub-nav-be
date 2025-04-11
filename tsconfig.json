@@ -1,32 +1,32 @@
 {
   "compilerOptions": {
+
+    // Performance Options
+    "incremental": true,
     // Basic Options
     "target": "ESNext",
-    "module": "commonjs",
-    "outDir": "./dist",
-    "declaration": true,
-    "sourceMap": true,
-    "removeComments": true,
-
-    // Strict Type-Checking Options
-    "strict": false,
-    "strictNullChecks": true,
-    "strictBindCallApply": false,
-    "noImplicitAny": false,
-
-    // Module Resolution Options
-    "allowSyntheticDefaultImports": true,
-    "forceConsistentCasingInFileNames": true,
 
     // Experimental Options
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
+    "module": "commonjs",
+
+    // Strict Type-Checking Options
+    "strict": false,
+    "strictBindCallApply": false,
+    "strictNullChecks": true,
 
     // Additional Checks
     "noFallthroughCasesInSwitch": false,
+    "noImplicitAny": false,
+    "declaration": true,
+    "outDir": "./dist",
+    "removeComments": true,
+    "sourceMap": true,
 
-    // Performance Options
-    "incremental": true,
+    // Module Resolution Options
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true
   }
 }

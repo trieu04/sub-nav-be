@@ -119,11 +119,11 @@ export class AuthService {
   }
 
   async googleSignIn(dto: GoogleOAuthDto) {
-    const { tokens } = await this.googleOAuthService.getToken(dto.code).catch(() => {
+    const { tokens } = await this.googleOAuthService.client.getToken(dto.code).catch(() => {
       throw new UnauthorizedException("Invalid code");
     });
 
-    const ticket = await this.googleOAuthService.verifyIdToken({ idToken: tokens.id_token ?? "" }).catch(() => {
+    const ticket = await this.googleOAuthService.client.verifyIdToken({ idToken: tokens.id_token ?? "" }).catch(() => {
       throw new UnauthorizedException();
     });
 
