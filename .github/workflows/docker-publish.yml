@@ -3,14 +3,18 @@ name: Docker
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - Dockerfile
+      - package.json
+      - yarn.lock
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-
     env:
-      DOCKER_TAG:
-
+      DOCKER_TAG: latest
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -24,16 +28,90 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Determine Docker Tag
-        run: |
-          if [ ${{ github.event_name }} == "pull_request" ]; then
-            echo "DOCKER_TAG=pr-${{ github.event.number }}" >> $GITHUB_ENV
-          else
-            echo "DOCKER_TAG=latest" >> $GITHUB_ENV
-          fi
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/sub-nav-be
+          tags: |
+            type=raw,value=${{ env.DOCKER_TAG }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/sub-nav-be:${{ env.DOCKER_TAG }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  test-run:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    env:
+      DOCKER_TAG: latest
+    steps:
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/sub-nav-be
+          tags: |
+            type=raw,value=${{ env.DOCKER_TAG }}
+
+      - name: Create dummy config file
+        run: |
+          mkdir -p config
+          echo "${{ secrets.CONFIG_TEST_YML }}" > config/default.yml
+
+      - name: Run container and check status
+        run: |
+          CONTAINER_NAME=test-sub-nav-be
+
+          echo "Testing image: ${{ steps.meta.outputs.tags }}"
+
+          docker run -d --rm \
+            -v $(pwd)/config:/app/config \
+            --name $CONTAINER_NAME \
+            -p 3000:3000 \
+            ${{ steps.meta.outputs.tags }}
+
+          echo "Waiting for container to start..."
+          sleep 15
+
+          echo "Checking container status..."
+          if [ "$(docker inspect -f '{{.State.Status}}' $CONTAINER_NAME)" == "running" ]; then
+            echo "Container is running. Performing health check..."
+            if curl -fs http://localhost:3000/health > /dev/null; then # curl -f: Fail silently, curl -s: Silent mode.
+              echo "Health check successful."
+              echo "--- Container Logs (optional) ---"
+              docker logs $CONTAINER_NAME
+              echo "--- End Logs ---"
+            else
+              echo "Health check failed!"
+              echo "--- Container Logs ---"
+              docker logs $CONTAINER_NAME
+              echo "--- End Logs ---"
+              docker stop $CONTAINER_NAME || echo "Failed to stop container."
+              exit 1
+            fi
+
+            echo "Stopping container..."
+            docker stop $CONTAINER_NAME || echo "Failed to stop container."
+            echo "Container stopped."
+          else
+            echo "Container failed to start or exited prematurely."
+            echo "--- Container Logs ---"
+            docker logs $CONTAINER_NAME || echo "Could not retrieve logs."
+            echo "--- End Logs ---"
+            exit 1
+          fi
