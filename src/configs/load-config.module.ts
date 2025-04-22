@@ -12,20 +12,34 @@ const logger = new Logger("LoadConfigModule");
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [
-        createLoaderForConfigName("default"),
-        createLoaderForConfigName(env.NODE_ENV),
-      ].filter(loader => loader !== null),
+      load: getConfigLoaders(["default", env.NODE_ENV]),
     }),
   ],
 })
 export class LoadConfigModule {}
 
-function createLoaderForConfigName(baseName?: string) {
-  if (!baseName) {
-    return null;
+function getConfigLoaders(configNames: (string | undefined)[]): (() => Record<string, any>)[] {
+  const loaders: (() => Record<string, any>)[] = [];
+  for (const configName of configNames) {
+    if (!configName) {
+      continue;
+    }
+
+    const loader = createLoaderForConfigName(configName);
+
+    if (loader) {
+      loaders.push(loader);
+    }
   }
 
+  if (loaders.length === 0) {
+    logger.warn("No configuration files were loaded. The loaders array is empty.");
+  }
+
+  return loaders;
+}
+
+function createLoaderForConfigName(baseName: string): (() => Record<string, any>) | null {
   const yamlPath = join(CONFIG_FOLDER, `${baseName}.yaml`);
   const ymlPath = join(CONFIG_FOLDER, `${baseName}.yml`);
 
