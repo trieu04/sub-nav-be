@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { Observable } from "rxjs";
 import { UserRoleEnum } from "../../../entities/user.entity";
-import { JwtPayloadAuthDto } from "../dtos/jwt-payload-auth.dto";
+import { JwtPayloadAuthDto } from "../dtos/jwt-payload.dto";
 
 @Injectable()
 export class AdminGuard implements CanActivate {

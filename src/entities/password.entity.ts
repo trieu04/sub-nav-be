@@ -3,7 +3,7 @@ import { BaseEntity } from "../common/entities/base.entity";
 import { UserEntity } from "./user.entity";
 
 @Entity("user_password")
-export class UserPasswordEntity extends BaseEntity {
+export class PasswordEntity extends BaseEntity {
   @Column()
   password: string;
 

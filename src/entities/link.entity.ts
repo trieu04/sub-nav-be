@@ -20,9 +20,9 @@ export class LinkEntity extends BaseEntity {
   @JoinColumn()
   domain: DomainEntity;
 
-  @Column({nullable: true})
+  @Column({ nullable: true })
   public: boolean;
-  
+
   @ManyToOne(() => UserEntity, { onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn()
   user: UserEntity;

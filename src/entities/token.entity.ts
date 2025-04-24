@@ -8,7 +8,7 @@ export enum TokenTypeEnum {
 }
 
 @Entity("user_token")
-export class UserTokenEntity extends BaseEntity {
+export class TokenEntity extends BaseEntity {
   @Column()
   userId: string;
 

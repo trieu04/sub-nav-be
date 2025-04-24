@@ -1,10 +1,10 @@
 import { Module } from "@nestjs/common";
-import { GoogleOauthService } from "./google-oauth.service";
+import { GoogleOAuthService } from "./google-oauth.service";
 
 @Module({
   imports: [],
   controllers: [],
-  providers: [GoogleOauthService],
-  exports: [GoogleOauthService],
+  providers: [GoogleOAuthService],
+  exports: [GoogleOAuthService],
 })
 export class GoogleOauthModule { }

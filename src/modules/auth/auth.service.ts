@@ -10,30 +10,28 @@ import { Repository } from "typeorm";
 import { SALT_ROUND } from "../../common/constrains/crypto";
 import { TOKEN_EXPIRATION } from "../../common/constrains/token";
 import { AccountEntity, AccountProviderEnum } from "../../entities/account.entity";
-import { UserPasswordEntity } from "../../entities/user-password";
-import { TokenTypeEnum, UserTokenEntity } from "../../entities/user-token";
+import { PasswordEntity } from "../../entities/password.entity";
+import { TokenTypeEnum, TokenEntity } from "../../entities/token.entity";
 import { UserEntity } from "../../entities/user.entity";
-import { GoogleOauthService } from "../google-oauth/google-oauth.service";
-import { MailService } from "../mail/mail.service";
-import { ChangePasswordDto } from "./dtos/change-password.dto";
+import { GoogleOAuthService } from "../google-oauth/google-oauth.service";
+import { ChangePasswordDto, RequestPasswordResetDto, ResetPasswordWithCodeDto } from "./dtos/password.dto";
 import { GoogleOAuthDto } from "./dtos/google-oauth.dto";
-import { MailResetPasswordDto, ResetPasswordConfirmDto } from "./dtos/reset-password.dto";
-import { SignInDto } from "./dtos/sign-in.dto";
-import { SignUpDto } from "./dtos/sign-up.dto";
-import { JwtPayloadAuthDto } from "./dtos/jwt-payload-auth.dto";
+import { SignInDto, SignUpDto } from "./dtos/auth.dto";
+import { JwtPayloadAuthDto } from "./dtos/jwt-payload.dto";
+import { ChangeUsernameDto } from "./dtos/username.dto";
+import { Request } from "express";
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(UserEntity) private userRepo: Repository<UserEntity>,
     @InjectRepository(AccountEntity) private accountRepo: Repository<AccountEntity>,
-    @InjectRepository(UserPasswordEntity) private userPasswordRepo: Repository<UserPasswordEntity>,
-    @InjectRepository(UserTokenEntity) private userTokenRepo: Repository<UserTokenEntity>,
+    @InjectRepository(PasswordEntity) private passwordRepo: Repository<PasswordEntity>,
+    @InjectRepository(TokenEntity) private userTokenRepo: Repository<TokenEntity>,
     private jwtService: JwtService,
     private configService: ConfigService,
-    private mailService: MailService,
     private mailerService: MailerService,
-    private googleOAuthService: GoogleOauthService,
+    private googleOAuthService: GoogleOAuthService,
   ) { }
 
   async authenticateUser(user: UserEntity) {
@@ -53,8 +51,18 @@ export class AuthService {
     };
   }
 
+  async getUser(userId: string) {
+    const user = await this.userRepo.findOne({
+      where: {
+        id: userId,
+      },
+    });
+
+    return user;
+  }
+
   async signIn(dto: SignInDto) {
-    let user: UserEntity | undefined | null = await this.userRepo.findOne({
+    const user = await this.userRepo.findOne({
       where: [
         { username: dto.username },
         { email: dto.username },
@@ -62,20 +70,10 @@ export class AuthService {
     });
 
     if (!user) {
-      const account = await this.accountRepo.findOne({
-        where: { email: dto.username },
-        relations: {
-          user: true,
-        },
-      });
-      user = account?.user;
+      throw new UnauthorizedException("Not found user");
     }
 
-    if (!user) {
-      throw new UnauthorizedException("Not found account");
-    }
-
-    const userPassword = await this.userPasswordRepo.findOne({
+    const userPassword = await this.passwordRepo.findOne({
       where: { userId: user.id },
     });
 
@@ -88,63 +86,106 @@ export class AuthService {
   }
 
   async signUp(dto: SignUpDto) {
-    const existingUser = await this.accountRepo.findOne({
-      where: { email: dto.email },
+    const { email, name } = dto;
+
+    const existingUser = await this.userRepo.findOne({
+      where: { email },
     });
+
     if (existingUser) {
-      throw new BadRequestException("User already exists");
+      throw new BadRequestException("User with this email already exists");
     }
 
     const user = this.userRepo.create({
-      email: dto.email,
-      name: dto.name,
+      email,
+      name,
     });
     await this.userRepo.save(user);
 
-    const account = this.accountRepo.create({
-      user,
-      provider: AccountProviderEnum.LOCAL,
-      email: dto.email,
-    });
-    const userPassword = this.userPasswordRepo.create({
+    const userPassword = this.passwordRepo.create({
       user,
       password: hashSync(dto.password, SALT_ROUND),
     });
-    await Promise.all([
-      this.accountRepo.save(account),
-      this.userPasswordRepo.save(userPassword),
-    ]);
+    this.passwordRepo.save(userPassword);
 
     return this.authenticateUser(user);
   }
 
-  async googleSignIn(dto: GoogleOAuthDto) {
-    const { tokens } = await this.googleOAuthService.client.getToken(dto.code).catch(() => {
-      throw new UnauthorizedException("Invalid code");
-    });
+  async getGoogleOAuth(req: Request, redirectPath: string) {
+    const redirectUri = `${req.protocol}://${req.headers.host}${redirectPath}`;
+    const oAuthUrl = this.googleOAuthService.generateGoogleOAuthUrl({ redirectUri });
+    this.googleOAuthService.createClient(`redirect_uri:${redirectUri}`, { redirectUri });
 
-    const ticket = await this.googleOAuthService.client.verifyIdToken({ idToken: tokens.id_token ?? "" }).catch(() => {
-      throw new UnauthorizedException();
-    });
+    return {
+      url: oAuthUrl,
+    };
+  }
+
+  async googleOAuthCallback(req: Request) {
+    const { code, error } = req.query;
+    if (error) {
+      throw new UnauthorizedException(`Login error: ${error}`);
+    }
+
+    if (!code || typeof code !== "string") {
+      throw new BadRequestException("Authorization code is missing or has an invalid format");
+    }
+
+    const redirectUri = `${req.protocol}://${req.headers.host}${req.originalUrl}`;
+
+    return this.signInWithGoogle({ code }, `redirect_uri:${redirectUri}`);
+  }
+
+  async signInWithGoogle(dto: GoogleOAuthDto, clientName?: string) {
+    const getTokenOrThrow = async (code: string) => {
+      try {
+        const { tokens } = await this.googleOAuthService.getToken(code, clientName);
+        if (!tokens.id_token || !tokens.access_token || !tokens.refresh_token || !tokens.token_type || !tokens.expiry_date) {
+          throw new UnauthorizedException("Invalid token");
+        }
+        return {
+          idToken: tokens.id_token,
+          accessToken: tokens.access_token,
+          refreshToken: tokens.refresh_token,
+          expiryAt: new Date(tokens.expiry_date),
+          tokenType: tokens.token_type,
+        };
+      }
+      catch {
+        throw new UnauthorizedException("Invalid code");
+      }
+    };
+
+    const verifyTokenOrThrow = async (idToken: string) => {
+      try {
+        return await this.googleOAuthService.client.verifyIdToken({ idToken });
+      }
+      catch {
+        throw new UnauthorizedException();
+      }
+    };
+
+    const tokenData = await getTokenOrThrow(dto.code);
+    const ticket = await verifyTokenOrThrow(tokenData.idToken);
 
     const payload = ticket.getPayload();
-
     if (!payload) {
       throw new UnauthorizedException();
     }
 
-    let user = await this.userRepo.findOne({
-      where: {
-        email: payload.email,
-      },
-    });
-
-    let account = await this.accountRepo.findOne({
-      where: {
-        providerAccountId: payload.sub,
-        provider: AccountProviderEnum.GOOGLE,
-      },
-    });
+    let [user, account] = await Promise.all([
+      this.userRepo.findOne({
+        where: {
+          email: payload.email,
+        },
+      }),
+      this.accountRepo.findOne({
+        where: {
+          providerAccountId: payload.sub,
+          provider: AccountProviderEnum.GOOGLE,
+        },
+      }),
+    ]);
 
     if (!user) {
       const newUser = this.userRepo.create({
@@ -160,52 +201,70 @@ export class AuthService {
         user,
         provider: AccountProviderEnum.GOOGLE,
         providerAccountId: payload.sub,
-        email: payload.email ?? null,
-        emailVerified: payload.email_verified ?? null,
-        accessToken: tokens.access_token ?? null,
-        refreshToken: tokens.refresh_token ?? null,
-        expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
-        tokenType: tokens.token_type ?? null,
-        scope: tokens.scope ?? null,
-        idToken: tokens.id_token ?? null,
+        accessToken: tokenData.accessToken,
+        refreshToken: tokenData.refreshToken,
+        expiryAt: tokenData.expiryAt,
+        idToken: tokenData.idToken,
       } as AccountEntity);
 
-      account = await newAccount.save();
+      account = await this.accountRepo.save(newAccount);
     }
-
     else {
-      Object.assign(account, {
-        email: payload.email ?? account.email,
-        emailVerified: payload.email_verified ?? account.emailVerified,
-        accessToken: tokens.access_token ?? account.accessToken,
-        refreshToken: tokens.refresh_token ?? account.refreshToken,
-        expiryDate: tokens.expiry_date ? new Date(tokens.expiry_date) : account.expiryDate,
-        tokenType: tokens.token_type ?? account.tokenType,
-        scope: tokens.scope ?? account.scope,
-        idToken: tokens.id_token ?? account.idToken,
-      });
+      account.accessToken = tokenData.accessToken || account.accessToken;
+      account.refreshToken = tokenData.refreshToken || account.refreshToken;
+      account.expiryAt = tokenData.expiryAt;
+      account.idToken = tokenData.idToken;
+
       await this.accountRepo.save(account);
     }
 
     return this.authenticateUser(user);
   }
 
+  async changeUsername(userId: string, dto: ChangeUsernameDto) {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new BadRequestException("User not found");
+    }
+
+    const existingUser = await this.userRepo.findOne({
+      where: {
+        username: dto.username,
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException("Username already exists");
+    }
+
+    user.username = dto.username;
+    await user.save();
+
+    return true;
+  }
+
   async getPassword(userId: string) {
-    const userPassword = await this.userPasswordRepo.findOne({
+    let updatedAt: Date | null = null;
+
+    const userPassword = await this.passwordRepo.findOne({
       where: {
         userId,
       },
     });
-
-    const { updatedAt } = userPassword ?? { updatedAt: null };
+    if (userPassword) {
+      updatedAt = userPassword.updatedAt;
+    }
 
     return {
       updatedAt,
     };
   }
 
-  async createPassword(dto: ChangePasswordDto, userId: string) {
-    const userPassword = await this.userPasswordRepo.findOne({
+  async createPassword(userId: string, dto: ChangePasswordDto) {
+    const userPassword = await this.passwordRepo.findOne({
       where: {
         userId,
       },
@@ -215,18 +274,18 @@ export class AuthService {
       throw new BadRequestException("User already has password");
     }
 
-    const newUserPassword = this.userPasswordRepo.create({
+    const newUserPassword = this.passwordRepo.create({
       userId,
       password: hashSync(dto.newPassword, SALT_ROUND),
     });
 
-    await this.userPasswordRepo.insert(newUserPassword);
+    await this.passwordRepo.insert(newUserPassword);
 
     return true;
   }
 
-  async chagePassword(dto: ChangePasswordDto, userId: string) {
-    const userPassword = await this.userPasswordRepo.findOne({
+  async chagePassword(userId: string, dto: ChangePasswordDto) {
+    const userPassword = await this.passwordRepo.findOne({
       where: {
         userId,
       },
@@ -249,31 +308,16 @@ export class AuthService {
     return true;
   }
 
-  async getProfile(userId: string) {
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
     const user = await this.userRepo.findOne({
-      where: {
-        id: userId,
-      },
-    });
-
-    return user;
-  }
-
-  async mailResetPassword(dto: MailResetPasswordDto) {
-    const account = await this.accountRepo.findOne({
       where: {
         email: dto.email,
       },
-      relations: {
-        user: true,
-      },
     });
 
-    if (!account) {
+    if (!user) {
       throw new BadRequestException("User with this email not found");
     }
-
-    const { user } = account;
 
     const userToken = this.userTokenRepo.create({
       userId: user.id,
@@ -289,22 +333,20 @@ export class AuthService {
     const resetLink = new URL(dto.endpointUrl);
     resetLink.searchParams.append("code", code);
 
-    const result = await this.mailerService.sendMail({
+    await this.mailerService.sendMail({
       subject: "[MePro Account] Reset Password",
       template: "password-reset.hbs",
-      to: account.email,
+      to: `${user.name} <${user.email}>`,
       context: {
         name: user.name,
         resetLink,
       },
     });
 
-    await this.mailService.saveSentEmail(result);
-
     return true;
   }
 
-  async resetPasswordConfirm(dto: ResetPasswordConfirmDto) {
+  async resetPasswordWithCode(dto: ResetPasswordWithCodeDto) {
     const [tokenId, token] = dto.code.split("$");
 
     const userToken = await this.userTokenRepo.findOne({
@@ -325,7 +367,7 @@ export class AuthService {
 
     userToken.revoked = true;
 
-    const userPassword = await this.userPasswordRepo.findOne({
+    const userPassword = await this.passwordRepo.findOne({
       where: {
         userId: userToken.userId,
       },

@@ -1,4 +1,4 @@
-import { Column, Entity, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { BaseEntity } from "../common/entities/base.entity";
 import { UserEntity } from "./user.entity";
 
@@ -16,35 +16,21 @@ export class AccountEntity extends BaseEntity {
   providerAccountId: string;
 
   @Column({ nullable: true })
-  email: string;
-
-  @Column({ nullable: true })
-  emailVerified: boolean;
-
-  @Column({ nullable: true })
   accessToken: string;
 
   @Column({ nullable: true })
   refreshToken: string;
 
   @Column({ nullable: true })
-  expiryDate: Date;
-
-  @Column({ nullable: true })
-  tokenType: string;
-
-  @Column({ nullable: true })
-  scope: string;
+  expiryAt: Date;
 
   @Column({ nullable: true })
   idToken: string;
-
-  @Column({ nullable: true })
-  sessionState: string;
 
   @Column()
   userId: string;
 
   @ManyToOne(() => UserEntity, { onDelete: "CASCADE", onUpdate: "CASCADE" })
+  @JoinColumn()
   user: UserEntity;
 }

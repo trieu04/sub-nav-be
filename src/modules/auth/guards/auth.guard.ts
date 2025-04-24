@@ -4,15 +4,17 @@ import { JwtService } from "@nestjs/jwt";
 import { ClassConstructor, plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { Request } from "express";
-import { JwtPayloadDto } from "../dtos/jwt-payload.dto";
-import { JwtPayloadAuthDto } from "../dtos/jwt-payload-auth.dto";
+import { JwtPayloadAuthDto, JwtPayloadDto } from "../dtos/jwt-payload.dto";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
+  private jwtSecret?: string;
   constructor(
     private jwtService: JwtService,
     private configService: ConfigService,
-  ) { }
+  ) {
+    this.jwtSecret = this.configService.get("jwt.secret");
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request: Request = context.switchToHttp().getRequest();
@@ -25,8 +27,8 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException("Invalid token");
     });
 
-    const jwtPayload = await this.verifyPayload(payload, JwtPayloadAuthDto).catch((err) => {
-      throw new UnauthorizedException(err.message);
+    const jwtPayload = await this.verifyPayload(payload, JwtPayloadAuthDto).catch(() => {
+      throw new UnauthorizedException("Invalid token payload");
     });
 
     request.jwtPayload = jwtPayload;
@@ -40,7 +42,7 @@ export class AuthGuard implements CanActivate {
 
   protected async verifyToken(token: string) {
     return this.jwtService.verify(token, {
-      secret: this.configService.get("jwt.secret"),
+      secret: this.jwtSecret,
     });
   }
 
@@ -48,7 +50,7 @@ export class AuthGuard implements CanActivate {
     const payloadDto = plainToInstance(cls, payload);
     const errors = await validate(payloadDto);
     if (errors.length > 0) {
-      throw new Error("Invalid token");
+      throw errors;
     }
 
     return payloadDto;

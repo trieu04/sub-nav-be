@@ -1,15 +1,14 @@
-import { BadRequestException, Body, ClassSerializerInterceptor, Controller, Get, HttpCode, Post, UnauthorizedException, UseGuards, UseInterceptors, UsePipes, ValidationPipe } from "@nestjs/common";
+import { BadRequestException, Body, ClassSerializerInterceptor, Controller, Get, HttpCode, Post, Req, UnauthorizedException, UseGuards, UseInterceptors, UsePipes, ValidationPipe } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Request } from "express";
 import { ApiHttpException } from "../../common/decorators/api-http-exception.decorator";
 import { UserDto } from "../users/dto/user.dto";
 import { AuthService } from "./auth.service";
 import { GetUserId } from "./decorators/get-user-id.decorator";
-import { ChangePasswordDto } from "./dtos/change-password.dto";
-import { GetPasswordResponseDto } from "./dtos/get-password.dto";
+import { GoogleOAuthUrlSuccessResponseDto, SignInDto, SignInSuccessResponseDto, SignUpDto, SignUpSuccessResponseDto } from "./dtos/auth.dto";
 import { GoogleOAuthDto } from "./dtos/google-oauth.dto";
-import { MailResetPasswordDto, ResetPasswordConfirmDto } from "./dtos/reset-password.dto";
-import { SignInDto, SignInSuccessResponseDto } from "./dtos/sign-in.dto";
-import { SignUpDto, SignUpSuccessResponseDto } from "./dtos/sign-up.dto";
+import { ChangePasswordDto, GetPasswordResponseDto, RequestPasswordResetDto, ResetPasswordWithCodeDto } from "./dtos/password.dto";
+import { ChangeUsernameDto } from "./dtos/username.dto";
 import { AuthGuard } from "./guards/auth.guard";
 
 @ApiTags("Auth")
@@ -20,6 +19,16 @@ export class AuthController {
   constructor(
     private authService: AuthService,
   ) { }
+
+  @Get("me")
+  @ApiBearerAuth()
+  @ApiOkResponse({ type: UserDto })
+  @ApiHttpException(() => [UnauthorizedException])
+  @UseGuards(AuthGuard)
+  @HttpCode(200)
+  async getUser(@GetUserId() userId: string) {
+    return this.authService.getUser(userId);
+  }
 
   @Post("sign-in")
   @ApiOkResponse({ type: SignInSuccessResponseDto })
@@ -37,12 +46,36 @@ export class AuthController {
     return this.authService.signUp(dto);
   }
 
-  @Post("google")
+  @Get("google-oauth")
+  @ApiOkResponse({ type: GoogleOAuthUrlSuccessResponseDto })
+  @HttpCode(200)
+  async getGoogleOAuth(@Req() req: Request) {
+    return this.authService.getGoogleOAuth(req, "/auth/google-oauth/callback");
+  }
+
+  @Get("google-oauth/callback")
   @ApiOkResponse({ type: SignInSuccessResponseDto })
   @ApiHttpException(() => [BadRequestException, UnauthorizedException])
   @HttpCode(200)
-  googleSignIn(@Body() dto: GoogleOAuthDto) {
-    return this.authService.googleSignIn(dto);
+  async googleOAuthCallback(@Req() req: Request) {
+    return this.authService.googleOAuthCallback(req);
+  }
+
+  @Post("sign-in-with-google")
+  @ApiOkResponse({ type: SignInSuccessResponseDto })
+  @ApiHttpException(() => [BadRequestException, UnauthorizedException])
+  @HttpCode(200)
+  async googleSignIn(@Body() dto: GoogleOAuthDto) {
+    return this.authService.signInWithGoogle(dto);
+  }
+
+  @Post("change-username")
+  @ApiBearerAuth()
+  @ApiHttpException(() => [BadRequestException, UnauthorizedException])
+  @UseGuards(AuthGuard)
+  @HttpCode(200)
+  async changeUsername(@GetUserId() userId: string, @Body() dto: ChangeUsernameDto) {
+    return this.authService.changeUsername(userId, dto);
   }
 
   @Get("password")
@@ -59,35 +92,26 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(AuthGuard)
   @HttpCode(200)
-  async changePassword(@Body() dto: ChangePasswordDto, @GetUserId() userId: string) {
+  async changePassword(@GetUserId() userId: string, @Body() dto: ChangePasswordDto) {
     if (dto.oldPassword) {
-      return this.authService.chagePassword(dto, userId);
+      return this.authService.chagePassword(userId, dto);
     }
     else {
-      return this.authService.createPassword(dto, userId);
+      return this.authService.createPassword(userId, dto);
     }
   }
 
-  @Get("me")
-  @ApiBearerAuth()
-  @ApiOkResponse({ type: UserDto })
-  @ApiHttpException(() => [UnauthorizedException])
-  @UseGuards(AuthGuard)
-  async getProfile(@GetUserId() userId: string) {
-    return this.authService.getProfile(userId);
-  }
-
-  @Post("mail-reset-password")
+  @Post("request-password-reset")
   @ApiHttpException(() => [BadRequestException])
   @HttpCode(200)
-  async resetPassword(@Body() dto: MailResetPasswordDto) {
-    return this.authService.mailResetPassword(dto);
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordReset(dto);
   }
 
-  @Post("reset-password")
+  @Post("reset-password-with-code")
   @ApiHttpException(() => [BadRequestException])
   @HttpCode(200)
-  async resetPasswordConfirm(@Body() dto: ResetPasswordConfirmDto) {
-    return this.authService.resetPasswordConfirm(dto);
+  async resetPasswordWithCode(@Body() dto: ResetPasswordWithCodeDto) {
+    return this.authService.resetPasswordWithCode(dto);
   }
 }

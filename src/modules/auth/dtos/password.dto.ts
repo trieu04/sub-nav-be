@@ -1,8 +1,24 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { IsOptional, IsString, IsUrl } from "class-validator";
 import { Transform } from "class-transformer";
-import { IsString, IsUrl } from "class-validator";
 
-export class MailResetPasswordDto {
+export class ChangePasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsOptional()
+  oldPassword: string;
+
+  @ApiProperty()
+  @IsString()
+  newPassword: string;
+}
+
+export class GetPasswordResponseDto {
+  @ApiProperty({ nullable: true })
+  updatedAt: Date;
+}
+
+export class RequestPasswordResetDto {
   @ApiProperty()
   @IsUrl({ require_tld: false, require_protocol: true })
   endpointUrl: string;
@@ -13,7 +29,7 @@ export class MailResetPasswordDto {
   email: string;
 }
 
-export class ResetPasswordConfirmDto {
+export class ResetPasswordWithCodeDto {
   @ApiProperty()
   @IsString()
   code: string;

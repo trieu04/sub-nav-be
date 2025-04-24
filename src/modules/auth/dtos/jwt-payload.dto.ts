@@ -1,7 +1,8 @@
-import { IsInt, IsNumber, Validate } from "class-validator";
+import { Equals, IsIn, IsInt, IsString, Validate } from "class-validator";
+import { UserRoleEnum } from "../../../entities/user.entity";
 
 export class JwtPayloadDto {
-  @IsNumber()
+  @IsString()
   sub: string;
 
   @IsInt()
@@ -12,4 +13,12 @@ export class JwtPayloadDto {
     message: "Token has expired",
   })
   exp: number;
+}
+
+export class JwtPayloadAuthDto extends JwtPayloadDto {
+  @Equals("auth")
+  service: "auth";
+
+  @IsIn(Object.values(UserRoleEnum), { each: true })
+  roles: UserRoleEnum[];
 }
