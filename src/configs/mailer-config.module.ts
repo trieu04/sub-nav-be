@@ -1,10 +1,10 @@
-import { MailerModule } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
-import { Logger, Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { join } from 'node:path';
+import { MailerModule } from "@nestjs-modules/mailer";
+import { HandlebarsAdapter } from "@nestjs-modules/mailer/dist/adapters/handlebars.adapter";
+import { Logger, Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { join } from "node:path";
 
-const logger = new Logger('MailerConfigModule');
+const logger = new Logger("MailerConfigModule");
 
 @Module({
   imports: [
