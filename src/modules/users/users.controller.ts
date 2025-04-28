@@ -1,9 +1,10 @@
 import { Crud, CrudController, CrudRequest, Override, ParsedRequest } from "@dataui/crud";
 import { Controller, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AdminGuard } from "../auth/guards/admin.guard";
+import { UserEntity, UserRoleEnum } from "../../entities/user.entity";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { AuthGuard } from "../auth/guards/auth.guard";
-import { UserEntity } from "../../entities/user.entity";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { UserDto } from "./dto/user.dto";
@@ -12,7 +13,8 @@ import { UsersService } from "./users.service";
 @Controller("users")
 @ApiTags("Users")
 @ApiBearerAuth()
-@UseGuards(AuthGuard, AdminGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Roles([UserRoleEnum.ADMIN])
 @Crud({
   model: {
     type: UserDto,

@@ -1,15 +1,7 @@
-import type {
-  ValidationArguments,
-  ValidationOptions,
-  ValidatorConstraintInterface,
-} from "class-validator";
-import {
-  registerDecorator,
-  ValidatorConstraint,
-} from "class-validator";
 import { Injectable } from "@nestjs/common";
-import type { DataSource } from "typeorm";
-import type { EntityClassOrSchema } from "@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type";
+import { EntityClassOrSchema } from "@nestjs/typeorm/dist/interfaces/entity-class-or-schema.type";
+import { registerDecorator, ValidationArguments, ValidationOptions, ValidatorConstraint, ValidatorConstraintInterface } from "class-validator";
+import { DataSource } from "typeorm";
 
 export function IsUnique(
   entityClass: EntityClassOrSchema,

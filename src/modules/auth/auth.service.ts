@@ -13,11 +13,11 @@ import { AccountEntity, AccountProviderEnum } from "../../entities/account.entit
 import { PasswordEntity } from "../../entities/password.entity";
 import { TokenTypeEnum, TokenEntity } from "../../entities/token.entity";
 import { UserEntity } from "../../entities/user.entity";
-import { GoogleOAuthService } from "../google-oauth/google-oauth.service";
+import { GoogleOAuthService } from "./google-oauth/google-oauth.service";
 import { ChangePasswordDto, RequestPasswordResetDto, ResetPasswordWithCodeDto } from "./dtos/password.dto";
 import { GoogleOAuthDto } from "./dtos/google-oauth.dto";
 import { SignInDto, SignUpDto } from "./dtos/auth.dto";
-import { JwtPayloadAuthDto } from "./dtos/jwt-payload.dto";
+import { JwtPayloadTypes, JwtPayloadUserDto } from "./dtos/jwt-payload.dto";
 import { ChangeUsernameDto } from "./dtos/username.dto";
 import { Request } from "express";
 
@@ -36,8 +36,8 @@ export class AuthService {
 
   async authenticateUser(user: UserEntity) {
     const currentTimestamp = Math.floor(Date.now() / 1000);
-    const payload: JwtPayloadAuthDto = {
-      service: "auth",
+    const payload: JwtPayloadUserDto = {
+      service: JwtPayloadTypes.AUTH_USER,
       sub: user.id,
       roles: user.roles,
       iat: currentTimestamp,

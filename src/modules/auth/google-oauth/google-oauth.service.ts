@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { OAuth2Client } from "google-auth-library";
-import { createConfigErrorProxy } from "../../common/proxies/create-config-error.proxy";
+import { createConfigErrorProxy } from "../../../common/proxies/create-config-error.proxy";
 
 @Injectable()
 export class GoogleOAuthService {

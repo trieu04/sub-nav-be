@@ -1,6 +1,10 @@
 import { Equals, IsIn, IsInt, IsString, Validate } from "class-validator";
 import { UserRoleEnum } from "../../../entities/user.entity";
 
+export const JwtPayloadTypes = {
+  AUTH_USER: "auth:user",
+} as const;
+
 export class JwtPayloadDto {
   @IsString()
   sub: string;
@@ -15,9 +19,9 @@ export class JwtPayloadDto {
   exp: number;
 }
 
-export class JwtPayloadAuthDto extends JwtPayloadDto {
-  @Equals("auth")
-  service: "auth";
+export class JwtPayloadUserDto extends JwtPayloadDto {
+  @Equals(JwtPayloadTypes.AUTH_USER)
+  service: typeof JwtPayloadTypes.AUTH_USER;
 
   @IsIn(Object.values(UserRoleEnum), { each: true })
   roles: UserRoleEnum[];

@@ -1,13 +1,16 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
-import { AdminGuard } from "../auth/guards/admin.guard";
+import { UserRoleEnum } from "../../entities/user.entity";
+import { Roles } from "../auth/decorators/roles.decorator";
 import { AuthGuard } from "../auth/guards/auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
 import { MailService } from "./mail.service";
 
 @Controller("mail")
 @ApiTags("mail")
 @ApiBearerAuth()
-@UseGuards(AuthGuard, AdminGuard)
+@UseGuards(AuthGuard, RolesGuard)
+@Roles([UserRoleEnum.ADMIN])
 export class MailController {
   constructor(private service: MailService) { }
 

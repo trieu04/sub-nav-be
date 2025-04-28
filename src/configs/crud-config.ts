@@ -5,4 +5,11 @@ CrudConfigService.load({
     limit: 10,
     alwaysPaginate: true,
   },
+  params: {
+    id: {
+      field: "id",
+      type: "uuid",
+      primary: true,
+    },
+  },
 });

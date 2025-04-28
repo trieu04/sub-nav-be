@@ -1,29 +1,37 @@
-import { BaseEntity, Column, Entity, JoinColumn, ManyToOne } from "typeorm";
+import { Column, Entity, JoinColumn, ManyToOne } from "typeorm";
 import { UserEntity } from "./user.entity";
+import { BaseEntity } from "../common/entities/base.entity";
 
-export enum DomainType {
+export enum DomainTypeEnum {
   DOMAIN = "domain",
   SUBDOMAIN = "subdomain",
 }
 
+export enum DomainGroupEnum {
+  PRIMARY = "primary",
+  LINK = "link",
+}
+
 @Entity("domain")
 export class DomainEntity extends BaseEntity {
-  @Column({ nullable: true })
-  domainName: string;
+  @Column({ nullable: true, unique: true })
+  name: string;
 
   @Column({ nullable: true })
-  name: string;
+  description: string;
 
   @Column({
     type: "enum",
-    enum: DomainType,
-    default: DomainType.DOMAIN,
+    enum: DomainTypeEnum,
+    default: DomainTypeEnum.DOMAIN,
   })
-  type: DomainType;
+  type: DomainTypeEnum;
 
-  @ManyToOne(() => DomainEntity, { nullable: true, onDelete: "CASCADE", onUpdate: "CASCADE" })
-  @JoinColumn()
-  domain: DomainEntity;
+  @Column({
+    type: "enum",
+    enum: DomainGroupEnum,
+  })
+  group: DomainGroupEnum;
 
   @ManyToOne(() => UserEntity, { nullable: true, onDelete: "CASCADE", onUpdate: "CASCADE" })
   @JoinColumn()

@@ -4,7 +4,14 @@ import { JwtService } from "@nestjs/jwt";
 import { ClassConstructor, plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { Request } from "express";
-import { JwtPayloadAuthDto, JwtPayloadDto } from "../dtos/jwt-payload.dto";
+import { JwtPayloadDto, JwtPayloadUserDto } from "../dtos/jwt-payload.dto";
+import { AuthenticatedUser } from "../models/authenticated-user.model";
+
+declare module "express" {
+  interface Request {
+    user?: AuthenticatedUser;
+  }
+}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -27,11 +34,15 @@ export class AuthGuard implements CanActivate {
       throw new UnauthorizedException("Invalid token");
     });
 
-    const jwtPayload = await this.verifyPayload(payload, JwtPayloadAuthDto).catch(() => {
+    const jwtPayload = await this.verifyPayload(payload, JwtPayloadUserDto).catch(() => {
       throw new UnauthorizedException("Invalid token payload");
     });
 
-    request.jwtPayload = jwtPayload;
+    request.user = new AuthenticatedUser({
+      id: jwtPayload.sub,
+      roles: jwtPayload.roles,
+    });
+
     return true;
   }
 
